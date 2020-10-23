@@ -38,6 +38,10 @@ namespace DatelAPI.Areas.Logger
             logger.Log(new LogEntry(LoggingEventType.Information, message));
         }
 
+        public static void Error(this ILogger logger, string message)
+        {
+            logger.Log(new LogEntry(LoggingEventType.Error, message));
+        }
         public static void Log(this ILogger logger, Exception exception)
         {
             logger.Log(new LogEntry(LoggingEventType.Error, exception.Message, exception));

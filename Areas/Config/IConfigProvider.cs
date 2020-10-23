@@ -14,6 +14,11 @@ namespace DatelAPI.Areas.Config
 
         bool SageLogging { get; set; }
 
+        string CTSConnectionStringLive { get; set; }
+
+        string SageConnectionStringLive { get; set; }
+
         string DatelSystemID { get; set; }
+
     }
 }

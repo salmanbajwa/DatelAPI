@@ -30,14 +30,17 @@ namespace DatelAPI.Areas.SalesOrders.Repositories
             try
             {
                 Dictionary<string, string> SystemKeys = new Dictionary<string, string>();
-                SystemKeys = await _data.GetDBLoginDetails(_config.DatelSystemID);
 
+                SystemKeys = await _data.GetDBLoginDetails(_config.DatelSystemID);
                 if (SystemKeys.Count == 0)
                 {
                     _logger.Log("Error: Unable to find System Keys");
+                    result.OrderPlaced = false;
+                    result.ErrorMessage = "Unable to find System Keys";
                     return result;
                 }
                 
+
                 FusionSDK.SalesOrder salesAPI = new FusionSDK.SalesOrder();
                 salesAPI.setSQL(SystemKeys["dbServer"], SystemKeys["dbName"], SystemKeys["dbLogin"], SystemKeys["dbPassword"]);
                 salesAPI.setDeveloperDebuggingMode(_config.SageLogging);
@@ -45,14 +48,17 @@ namespace DatelAPI.Areas.SalesOrders.Repositories
                 salesAPI.setOrderPrefix(SystemKeys["orderPrefix"].Trim().ToUpper());
 
                 salesAPI.setSalesOrderTrackingUser(SystemKeys["dbLogin"].Substring(0, 8));
+
                 salesAPI.setAuditFile(Convert.ToBoolean(SystemKeys["auditMode"]));
 
-                
                 salesAPI.setHeaderValueString("customer_order_no", so.CustomerRef.ID);
 
                 salesAPI.setHeaderValueString("lang", so.Delivery.DelAddr.DelCountry.Name);
+
                 salesAPI.setHeaderValueString("transaction_anals1", so.Delivery.DelParty.EndPoint);
+
                 salesAPI.setHeaderValueString("transaction_anals3", so.Delivery.DelParty.Logo);
+
                 if (! String.IsNullOrEmpty(so.additionalData.alpha))
                 {
                     salesAPI.setHeaderValueString("alpha", so.additionalData.alpha);
@@ -61,7 +67,6 @@ namespace DatelAPI.Areas.SalesOrders.Repositories
                 {
                     salesAPI.setHeaderValueString("shipping_text", so.Delivery.DelParty.DelContact.Tel);
                 }
-
                 foreach (var line in so.OrderLines)
                 {
                     salesAPI.addGoodsLineWithPrices(line.Item.ItemData.Warehouse, line.Item.ItemData.SKU, Convert.ToDouble(line.Item.Qty), line.Item.ItemData.ListPrice
@@ -98,7 +103,6 @@ namespace DatelAPI.Areas.SalesOrders.Repositories
 
                 string SageOrderRef = "";
                 string ErrorDesc = "";
-
                 if (salesAPI.submitOrder(so.additionalData.CustomerID))
                 {
                     SageOrderRef = salesAPI.getOrderNumber();
@@ -113,41 +117,92 @@ namespace DatelAPI.Areas.SalesOrders.Repositories
 
                     result.ErrorMessage = ErrorDesc;
                     _logger.Log($"Error: Sales Order creation failed: {so.CustomerRef.ID}. {ErrorDesc} ");
+                    return result;
                 }
 
                 if (SageOrderRef != "")
                 {
-                    OrderAllocation allocation = new OrderAllocation();
-
-                    allocation.setSQL(SystemKeys["dbServer"], SystemKeys["dbName"], SystemKeys["dbLogin"], SystemKeys["dbPassword"]);
-                    allocation.setDeveloperDebuggingMode(_config.SageLogging);
-                    allocation.setSchema(SystemKeys["dbScheme"]);
-                    allocation.allowSplitToBackOrder(so.additionalData.AllowBackOrder);
-                    allocation.setSoftAllocationOnly(Convert.ToBoolean(SystemKeys["softAllocationOnly"]));
-                    allocation.setSalesOrderTrackingUser(SystemKeys["dbLogin"].Substring(0, 8));
-                    allocation.setAuditFile(Convert.ToBoolean(SystemKeys["auditMode"]));
-
-                    result.StockAllocated = allocation.doAllocation(SageOrderRef);
-
-                    if (!result.StockAllocated)
+                    if (await _data.StockAllocateAllowed(SageOrderRef))
                     {
-                        result.ErrorMessage = allocation.getLastErrorMessage();
+                        OrderAllocation allocation = new OrderAllocation();
 
-                        if (result.ErrorMessage.Contains("Rerun the transaction"))
+                        allocation.setSQL(SystemKeys["dbServer"], SystemKeys["dbName"], SystemKeys["dbLogin"], SystemKeys["dbPassword"]);
+                        allocation.setDeveloperDebuggingMode(_config.SageLogging);
+                        allocation.setSchema(SystemKeys["dbScheme"]);
+                        allocation.allowSplitToBackOrder(so.additionalData.AllowBackOrder);
+                        allocation.setSoftAllocationOnly(Convert.ToBoolean(SystemKeys["softAllocationOnly"]));
+                        allocation.setSalesOrderTrackingUser(SystemKeys["dbLogin"].Substring(0, 8));
+                        allocation.setAuditFile(Convert.ToBoolean(SystemKeys["auditMode"]));
+
+                        result.StockAllocated = allocation.doAllocation(SageOrderRef);
+
+                        if (!result.StockAllocated)
                         {
-                            result.StockAllocated = allocation.doAllocation(SageOrderRef);
+                            result.ErrorMessage = allocation.getLastErrorMessage();
 
-                            if (result.StockAllocated)
-                            {
-                                result.ErrorMessage = "";
-                            }
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
+                result.OrderPlaced = false;
+                result.ErrorMessage = ex.Message;
                 _logger.Log(ex);
+            }
+            return result;
+        }
+
+
+        public async Task<SageOrderResponse> AllocateStock(string OrderRef)
+        {
+            SageOrderResponse result = new SageOrderResponse();
+            try
+            {
+                Dictionary<string, string> SystemKeys = new Dictionary<string, string>();
+                SystemKeys = await _data.GetDBLoginDetailsLive(_config.DatelSystemID);
+
+                if (SystemKeys.Count == 0)
+                {
+                    _logger.Log("Error: Unable to find System Keys");
+                    result.ErrorMessage = "Unable to find System Keys";
+                    return result;
+                }
+
+                OrderAllocation allocation = new OrderAllocation();
+
+                allocation.setSQL(SystemKeys["dbServer"], SystemKeys["dbName"], SystemKeys["dbLogin"], SystemKeys["dbPassword"]);
+                allocation.setDeveloperDebuggingMode(_config.SageLogging);
+                allocation.setSchema(SystemKeys["dbScheme"]);
+                allocation.allowSplitToBackOrder(Convert.ToBoolean(SystemKeys["AllowBackOrder"]));
+                allocation.setSoftAllocationOnly(Convert.ToBoolean(SystemKeys["softAllocationOnly"]));
+                allocation.setSalesOrderTrackingUser(SystemKeys["dbLogin"].Substring(0, 8));
+                allocation.setAuditFile(Convert.ToBoolean(SystemKeys["auditMode"]));
+
+                result.StockAllocated = allocation.doAllocation(OrderRef);
+
+                if (!result.StockAllocated)
+                {
+                    result.ErrorMessage = allocation.getLastErrorMessage();
+
+                    /*
+                    if (result.ErrorMessage.Contains("Rerun the transaction"))
+                    {
+                        result.StockAllocated = allocation.doAllocation(OrderRef);
+
+                        if (result.StockAllocated)
+                        {
+                            result.ErrorMessage = "";
+                        }
+                    }
+                    */
+                }
+
+            }
+            catch (Exception ex)
+            {
+                _logger.Log(ex);
+                result.ErrorMessage = ex.Message;
             }
             return result;
         }

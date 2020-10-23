@@ -29,18 +29,28 @@ namespace DatelAPI.Areas.PurchaseOrders.Repositories
         public async Task<SageOrderResponse> CreatePurchaseOrder(Hub.Models.PurchaseOrder po)
         {
             SageOrderResponse result = new SageOrderResponse();
+            result.ErrorCode = "0";
+            
+            result.OrderPlaced = false;
             try
             {
+                _logger.Log("Inside PurchaseOrder");
+
+                result.ErrorCode = "-1";
+
                 Dictionary<string, string> SystemKeys = new Dictionary<string, string>();
                 SystemKeys = await _data.GetDBLoginDetails(_config.DatelSystemID);
 
+                result.ErrorCode = "-2";
                 if (SystemKeys.Count == 0)
                 {
-                    _logger.Log("Error: Unable to find System Keys");
+                    _logger.Error("Error: Unable to find System Keys");
                     return result;
                 }
-                
+
+                result.ErrorCode = "-3";
                 FusionSDK.PurchaseOrder poAPI = new FusionSDK.PurchaseOrder();
+                result.ErrorCode = "-4";
                 poAPI.setSQL(SystemKeys["dbServer"], SystemKeys["dbName"], SystemKeys["dbLogin"], SystemKeys["dbPassword"]);
                 poAPI.setDeveloperDebuggingMode(_config.SageLogging);
                 poAPI.setSchema(SystemKeys["dbScheme"]);
@@ -84,12 +94,16 @@ namespace DatelAPI.Areas.PurchaseOrders.Repositories
                 string SageOrderRef = "";
                 string ErrorDesc = "";
 
+                result.ErrorCode = "1";
+
                 if (poAPI.submitOrder(po.additionalData.Supplier))
                 {
+                    result.ErrorCode = "2";
                     SageOrderRef = poAPI.getOrderNumber();
+                    result.ErrorCode = "3";
                     result.OrderRef = SageOrderRef;
                     result.OrderPlaced = true;
-
+                    result.ErrorCode = "4";
                     _logger.Log($"Purchase Order creation successful: {SageOrderRef}");
                 }
                 else
@@ -104,6 +118,8 @@ namespace DatelAPI.Areas.PurchaseOrders.Repositories
             catch (Exception ex)
             {
                 _logger.Log(ex);
+                result.ErrorMessage = ex.Message;
+                throw ex;
             }
             return result;
         }

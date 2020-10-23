@@ -9,5 +9,10 @@ namespace DatelAPI.Areas.Data
     public interface ISageData
     {
         Task<Dictionary<string, string>> GetDBLoginDetails(string systemID);
+
+        Task<Dictionary<string, string>> GetDBLoginDetailsLive(string systemID);
+
+        Task<bool> StockAllocateAllowed(string order_no);
+
     }
 }

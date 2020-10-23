@@ -30,12 +30,22 @@ namespace DatelAPI.Areas.SalesOrders.Controllers
             return Json(result);
         }
 
+
+        [Route("Stock")]
+        [HttpPost]
+        public async Task<IHttpActionResult> AllocateStock(StockAllocateRequest request)
+        {
+            
+            SageOrderResponse result = await _repository.AllocateStock(request.OrderRef);
+            return Json(result);
+        }
+
         [Route("Test")]
         [HttpGet]
         public async Task<IHttpActionResult> NextOrder()
         {
-
-            return Ok();
+            string Server = Environment.MachineName;
+            return Ok(Server);
         }
 
     }

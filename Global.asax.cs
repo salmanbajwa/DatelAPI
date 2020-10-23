@@ -44,6 +44,8 @@ namespace DatelAPI
         
         private static void ConfigureWebApi(Container container)
         {
+            GlobalFilters.Filters.Add(new ApplicationInsightsHandleErrorAttribute());
+
             GlobalConfiguration.Configure(configuration =>
             {
                 /*

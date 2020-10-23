@@ -10,5 +10,7 @@ namespace DatelAPI.Areas.SalesOrders.Repositories
     public interface IOrdersRepository
     {
         Task<SageOrderResponse> CreateSalesOrder(SalesOrder so);
+
+        Task<SageOrderResponse> AllocateStock(string OrderRef);
     }
 }

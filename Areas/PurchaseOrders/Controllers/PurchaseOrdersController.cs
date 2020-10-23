@@ -7,7 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
-
+using DatelAPI.Areas.Logger;
 
 namespace DatelAPI.Areas.PurchaseOrders.Controllers
 {
@@ -15,10 +15,11 @@ namespace DatelAPI.Areas.PurchaseOrders.Controllers
     public class PurchaseOrdersController : ApiController
     {
         private readonly IPurchaseOrdersRepository _repository;
-
-        public PurchaseOrdersController(IPurchaseOrdersRepository repository)
+        private readonly ILogger _logger;
+        public PurchaseOrdersController(IPurchaseOrdersRepository repository, ILogger logger)
         {
             _repository = repository;
+            _logger = logger;
         }
 
 
@@ -35,8 +36,8 @@ namespace DatelAPI.Areas.PurchaseOrders.Controllers
         [HttpGet]
         public async Task<IHttpActionResult> NextOrder()
         {
-
-            return Ok();
+            _logger.Log("Inside Test");
+            return Ok(100);
         }
 
     }
